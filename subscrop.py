@@ -8,11 +8,14 @@ from xml.etree import ElementTree
 from pathlib import Path
 
 from PIL import Image
+from pycountry import languages
 
 """
 todo:
-- read language code from xml and use '--language x'
 - keep correct color palette
+
+no easy fix:
+- cannot handle multiple streams in input files, it just processes the first one.
 """
 
 # argparse utils
@@ -101,7 +104,10 @@ def crop_subs_xml(xml_in: Path, left=0, top=0, right=0, bottom=0, dir_out=None, 
 	"""
 
 	xml = ElementTree.parse(xml_in)
-	events = xml.getroot().find("Events")
+	bdn = xml.getroot()
+
+	language = bdn.find("Description/Language").get("Code", "eng")
+	events = bdn.find("Events")
 
 	for event in events.iter("Event"):
 		for graphic in event.iter("Graphic"):
@@ -130,7 +136,7 @@ def crop_subs_xml(xml_in: Path, left=0, top=0, right=0, bottom=0, dir_out=None, 
 
 	xml.write(xml_out, encoding="utf-8", xml_declaration=True)
 
-	return Path(xml_out)
+	return language, Path(xml_out)
 
 def crop_subfile(executable, file_in, file_out, left=0, top=0, right=0, bottom=0, tempdir=None):
 	if tempdir is None:
@@ -138,8 +144,9 @@ def crop_subfile(executable, file_in, file_out, left=0, top=0, right=0, bottom=0
 	xml_file = tempdir / "subtitle-s847vfv.xml"
 
 	check_call([os.fspath(executable), "--no-verbose", "-o", os.fspath(xml_file), os.fspath(file_in)])
-	xml_file = crop_subs_xml(xml_file, left, top, right, bottom, overwrite=True, optimize=False)
-	check_call([os.fspath(executable), "--no-verbose", "-o", os.fspath(file_out), os.fspath(xml_file)])
+	language, xml_file = crop_subs_xml(xml_file, left, top, right, bottom, overwrite=True, optimize=False)
+	language = languages.get(alpha_3=language).alpha_2
+	check_call([os.fspath(executable), "--no-verbose", "--language", language, "-o", os.fspath(file_out), os.fspath(xml_file)])
 
 if __name__ == "__main__":
 	import argparse
