@@ -2,13 +2,14 @@ import os
 import os.path
 import logging
 from tempfile import gettempdir
-from glob import iglob
 from subprocess import check_call
 from xml.etree import ElementTree
 from pathlib import Path
 
 from PIL import Image
 from pycountry import languages
+
+from genutility.args import is_dir, is_file, future_file
 
 """
 todo:
@@ -18,55 +19,8 @@ no easy fix:
 - cannot handle multiple streams in input files, it just processes the first one.
 """
 
-# argparse utils
-
-import argparse
-
-def arg_to_path(func):
-	def inner(path):
-		return func(Path(path))
-	return inner
-
-@arg_to_path
-def is_dir(dirname):
-	"""Checks if a path is an actual directory"""
-
-	if not dirname.is_dir():
-		msg = "{0} is not a directory".format(dirname)
-		raise argparse.ArgumentTypeError(msg)
-
-	return dirname
-
-@arg_to_path
-def is_file(filename):
-	"""Checks if a path is an actual file"""
-
-	if not filename.is_file():
-		msg = "{0} is not a file".format(filename)
-		raise argparse.ArgumentTypeError(msg)
-
-	return filename
-
-@arg_to_path
-def future_file(filename):
-	""" Tests if file can be created to catch errors early.
-		Checks if directory is writable and file does not exist yet.
-	"""
-
-	head, tail = os.path.split(filename)
-
-	if head and not os.access(head, os.W_OK):
-		msg = "cannot access directory {0}".format(head)
-		raise argparse.ArgumentTypeError(msg)
-	if filename.is_file():
-		msg = "file {0} already exists".format(filename)
-		raise argparse.ArgumentTypeError(msg)
-
-	return filename
-
-# subscrop
-
-def crop(file_in: Path, file_out, left=0, top=0, right=0, bottom=0, format=None, optimize=True, overwrite=False):
+def crop(file_in, file_out, left=0, top=0, right=0, bottom=0, format=None, optimize=True, overwrite=False):
+	# type: (Path, str, int, int, int, int, Optional[str], bool, bool) -> Tuple[int, int]
 
 	if file_in.samefile(file_out) and not overwrite:
 		raise RuntimeError("Cannot overwrite files without corresponding argument")
@@ -89,7 +43,9 @@ def crop(file_in: Path, file_out, left=0, top=0, right=0, bottom=0, format=None,
 		return cropped.size
 
 # unused
-def batch_crop(path_in: Path, left=0, top=0, right=0, bottom=0, dir_out=None, postfix="", overwrite=False, optimize=True):
+def batch_crop(path_in, left=0, top=0, right=0, bottom=0, dir_out=None, postfix="", overwrite=False, optimize=True):
+	# type: (Path, int, int, int, int, Optional[str], str, bool, bool) -> Tuple[int, int]
+
 	""" crops all .png file in directory """
 
 	for file_in in path_in.glob("*.png"):
@@ -99,7 +55,9 @@ def batch_crop(path_in: Path, left=0, top=0, right=0, bottom=0, dir_out=None, po
 		except ValueError:
 			print("cannot crop file, skipping...")
 
-def crop_subs_xml(xml_in: Path, left=0, top=0, right=0, bottom=0, dir_out=None, postfix="", overwrite=False, optimize=True):
+def crop_subs_xml(xml_in, left=0, top=0, right=0, bottom=0, dir_out=None, postfix="", overwrite=False, optimize=True):
+	# type: (Path, int, int, int, int, Optional[str], str, bool, bool) -> Tuple[int, int]
+
 	""" crops xml/png format subtitle file
 	"""
 
@@ -151,10 +109,12 @@ def crop_subfile(executable, file_in, file_out, left=0, top=0, right=0, bottom=0
 if __name__ == "__main__":
 	import argparse
 
-	parser = argparse.ArgumentParser(prog="subscrop",
-		description="Crop picture based subtitle files. Expects 'bdsup2sub++' to be in path. Does not support multiple stream in one file.",
+	parser = argparse.ArgumentParser(
+		prog="subscrop",
+		description="Crop picture based subtitle files. Expects 'bdsup2sub++' to be in path. Does not support multiple streams in one file.",
 		epilog="Example: 'subscrop.py movie.sub movie.cropped.sub 0 10 0 0' to crop 10 pixels on the top of every subpicture.",
-		formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+		formatter_class=argparse.ArgumentDefaultsHelpFormatter
+	)
 	parser.add_argument('file_in', type=is_file, help="input subtitle file to crop [*.sub, *.sup]")
 	parser.add_argument('file_out', type=future_file, help="output cropped subtitle file [*.sub, *.sup]")
 	parser.add_argument("-t", '--temppath', type=is_dir, help="temporary directory", default=gettempdir())
